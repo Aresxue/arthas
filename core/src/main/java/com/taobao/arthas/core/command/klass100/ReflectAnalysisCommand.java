@@ -27,12 +27,9 @@ import com.taobao.middleware.cli.annotations.Summary;
 import java.io.File;
 import java.lang.instrument.Instrumentation;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import org.benf.cfr.reader.api.CfrDriver;
 
@@ -63,7 +60,7 @@ public class ReflectAnalysisCommand extends AnnotatedCommand {
         InstrumentationUtils.retransformClasses(inst, transformer, matchedClasses);
         Map<Class<?>, File> dumpResult = transformer.getDumpResult();
 
-        Map<String, String> options = new HashMap<String, String>(capacity(8));
+        Map<String, String> options = new HashMap<>(capacity(8));
         String outputDir = TEMP_DIR + "reflect-analysis";
         options.put("outputdir", outputDir);
         options.put("outputencoding", "UTF-8");
@@ -76,7 +73,7 @@ public class ReflectAnalysisCommand extends AnnotatedCommand {
         options.put("silent", "true");
 
         CfrDriver cfrDriver = new CfrDriver.Builder().withOptions(options).build();
-        List<String> toAnalyse = new ArrayList<String>();
+        List<String> toAnalyse = new ArrayList<>();
         for (File value : dumpResult.values()) {
           toAnalyse.add(value.getAbsolutePath());
         }
@@ -85,7 +82,7 @@ public class ReflectAnalysisCommand extends AnnotatedCommand {
         if (file.exists() && file.isDirectory()) {
           File[] files = file.listFiles();
           if (null != files) {
-            Map<String, List<String>> result = new HashMap<String, List<String>>(
+            Map<String, List<String>> result = new HashMap<>(
                 capacity(files.length));
 
             for (File javaFile : files) {
@@ -108,7 +105,7 @@ public class ReflectAnalysisCommand extends AnnotatedCommand {
                 if (null != refName) {
                   String key = invokeClassName + "#" + refName;
                   if (!result.containsKey(key)) {
-                    result.put(key, new ArrayList<String>());
+                    result.put(key, new ArrayList<>());
                   }
                   String generatedMethodAccessorName = javaFile.getName().replace(".java", "");
                   result.get(key).add(generatedMethodAccessorName);
@@ -130,12 +127,11 @@ public class ReflectAnalysisCommand extends AnnotatedCommand {
   }
 
   private static void processResult(CommandProcess process, Map<String, List<String>> result) {
-    List<ReflectAnalysisModel> reflectAnalysisModelList = new ArrayList<ReflectAnalysisModel>(
+    List<ReflectAnalysisModel> reflectAnalysisModelList = new ArrayList<>(
         result.size());
-    for (Entry<String, List<String>> entry : result.entrySet()) {
+    result.forEach((key, valueList) -> {
       ReflectAnalysisModel reflectAnalysisModel = new ReflectAnalysisModel();
-      reflectAnalysisModel.setRefName(entry.getKey());
-      List<String> valueList = entry.getValue();
+      reflectAnalysisModel.setRefName(key);
       reflectAnalysisModel.setGeneratedMethodAccessorNameCount(valueList.size());
       StringBuilder generatedMethodAccessorNames = new StringBuilder();
       for (String generatedMethodAccessorName : valueList) {
@@ -145,19 +141,16 @@ public class ReflectAnalysisCommand extends AnnotatedCommand {
           generatedMethodAccessorNames.substring(0,
               generatedMethodAccessorNames.length() - 1));
       reflectAnalysisModelList.add(reflectAnalysisModel);
-    }
-    Collections.sort(reflectAnalysisModelList, new Comparator<ReflectAnalysisModel>() {
-      @Override
-      public int compare(ReflectAnalysisModel leftMode, ReflectAnalysisModel rightModel) {
-        int leftCount = leftMode.getGeneratedMethodAccessorNameCount();
-        int rightCount = rightModel.getGeneratedMethodAccessorNameCount();
-        if (leftCount > rightCount) {
-          return 1;
-        } else if (leftCount < rightCount) {
-          return -1;
-        } else {
-          return leftMode.getRefName().compareTo(rightModel.getRefName());
-        }
+    });
+    reflectAnalysisModelList.sort((leftMode, rightModel) -> {
+      int leftCount = leftMode.getGeneratedMethodAccessorNameCount();
+      int rightCount = rightModel.getGeneratedMethodAccessorNameCount();
+      if (leftCount > rightCount) {
+        return 1;
+      } else if (leftCount < rightCount) {
+        return -1;
+      } else {
+        return leftMode.getRefName().compareTo(rightModel.getRefName());
       }
     });
     for (ReflectAnalysisModel reflectAnalysisModel : reflectAnalysisModelList) {
