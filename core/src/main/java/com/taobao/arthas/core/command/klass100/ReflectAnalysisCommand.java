@@ -146,9 +146,9 @@ public class ReflectAnalysisCommand extends AnnotatedCommand {
       int leftCount = leftMode.getGeneratedMethodAccessorNameCount();
       int rightCount = rightModel.getGeneratedMethodAccessorNameCount();
       if (leftCount > rightCount) {
-        return 1;
-      } else if (leftCount < rightCount) {
         return -1;
+      } else if (leftCount < rightCount) {
+        return 1;
       } else {
         return leftMode.getRefName().compareTo(rightModel.getRefName());
       }
