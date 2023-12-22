@@ -13,7 +13,7 @@ public class ReflectAnalysisView extends ResultView<ReflectAnalysisModel> {
 
   @Override
   public void draw(CommandProcess process, ReflectAnalysisModel result) {
-    String line = String.format("count=%s, ref=%s, names=%s",
+    String line = String.format("count=%s, refName=%s, names=%s",
         result.getGeneratedMethodAccessorNameCount(), result.getRefName(),
         result.getGeneratedMethodAccessorNames());
     process.write(line).write("\n");

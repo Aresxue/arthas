@@ -15,6 +15,7 @@ import com.github.javaparser.ast.expr.SimpleName;
 import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.ReturnStmt;
 import com.github.javaparser.ast.stmt.TryStmt;
+import com.taobao.arthas.core.command.model.EchoModel;
 import com.taobao.arthas.core.command.model.ReflectAnalysisModel;
 import com.taobao.arthas.core.shell.command.AnnotatedCommand;
 import com.taobao.arthas.core.shell.command.CommandProcess;
@@ -24,13 +25,18 @@ import com.taobao.arthas.core.util.InstrumentationUtils;
 import com.taobao.arthas.core.util.SearchUtils;
 import com.taobao.middleware.cli.annotations.Name;
 import com.taobao.middleware.cli.annotations.Summary;
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.OutputStreamWriter;
 import java.lang.instrument.Instrumentation;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import org.benf.cfr.reader.api.CfrDriver;
 
 /**
@@ -49,6 +55,18 @@ public class ReflectAnalysisCommand extends AnnotatedCommand {
 
   @Override
   public void process(CommandProcess process) {
+    String resultFilePath = "reflect-analysis.result";
+    String message = String.format(
+        "The reflect analysis.result result is being generated asynchronously, check the %s file later",
+        resultFilePath);
+    CompletableFuture.runAsync(() -> processImpl(process, resultFilePath));
+    process.appendResult(new EchoModel(message));
+    ExitStatus status = ExitStatus.success();
+
+    CommandUtils.end(process, status);
+  }
+
+  private ExitStatus processImpl(CommandProcess process, String resultFilePath) {
     ExitStatus status;
     try {
       Instrumentation inst = process.session().getInstrumentation();
@@ -113,7 +131,7 @@ public class ReflectAnalysisCommand extends AnnotatedCommand {
               }
             }
 
-            processResult(process, result);
+            processResult(process, result, resultFilePath);
           }
         }
       }
@@ -123,12 +141,12 @@ public class ReflectAnalysisCommand extends AnnotatedCommand {
       process.end(-1, "processing error");
       status = ExitStatus.failure(-1, "reflect analysis fail");
     }
-    CommandUtils.end(process, status);
+    return status;
   }
 
-  private static void processResult(CommandProcess process, Map<String, List<String>> result) {
-    List<ReflectAnalysisModel> reflectAnalysisModelList = new ArrayList<>(
-        result.size());
+  private void processResult(CommandProcess process, Map<String, List<String>> result,
+      String resultFilePath) {
+    List<ReflectAnalysisModel> resultList = new ArrayList<>(result.size());
     result.forEach((key, valueList) -> {
       ReflectAnalysisModel reflectAnalysisModel = new ReflectAnalysisModel();
       reflectAnalysisModel.setRefName(key);
@@ -140,9 +158,9 @@ public class ReflectAnalysisCommand extends AnnotatedCommand {
       reflectAnalysisModel.setGeneratedMethodAccessorNames(
           generatedMethodAccessorNames.substring(0,
               generatedMethodAccessorNames.length() - 1));
-      reflectAnalysisModelList.add(reflectAnalysisModel);
+      resultList.add(reflectAnalysisModel);
     });
-    reflectAnalysisModelList.sort((leftMode, rightModel) -> {
+    resultList.sort((leftMode, rightModel) -> {
       int leftCount = leftMode.getGeneratedMethodAccessorNameCount();
       int rightCount = rightModel.getGeneratedMethodAccessorNameCount();
       if (leftCount > rightCount) {
@@ -153,8 +171,13 @@ public class ReflectAnalysisCommand extends AnnotatedCommand {
         return leftMode.getRefName().compareTo(rightModel.getRefName());
       }
     });
-    for (ReflectAnalysisModel reflectAnalysisModel : reflectAnalysisModelList) {
-      process.appendResult(reflectAnalysisModel);
+    boolean async = true;
+    if (async) {
+      exportDataToCsvFile(resultList, resultFilePath);
+    } else {
+      for (ReflectAnalysisModel reflectAnalysisModel : resultList) {
+        process.appendResult(reflectAnalysisModel);
+      }
     }
   }
 
@@ -218,6 +241,40 @@ public class ReflectAnalysisCommand extends AnnotatedCommand {
       return (int) ((float) expectedSize / 0.75F + 1.0F);
     }
     return Integer.MAX_VALUE;
+  }
+
+  private void exportDataToCsvFile(List<ReflectAnalysisModel> reflectAnalysisModelList,
+      String resultFilePath) {
+    LOGGER.info("start write reflect analysis result: {} csv file: {}",
+        reflectAnalysisModelList.size(), resultFilePath);
+    File file = new File(resultFilePath);
+    try {
+      if (file.exists()) {
+        file.delete();
+      }
+      file.createNewFile();
+      // write csv file
+      try (BufferedWriter bufferedWriter = new BufferedWriter(
+          new OutputStreamWriter(Files.newOutputStream(file.toPath()), StandardCharsets.UTF_8))) {
+        bufferedWriter.write("count");
+        bufferedWriter.write(",");
+        bufferedWriter.write("refName");
+        bufferedWriter.write(",");
+        bufferedWriter.write("names");
+        bufferedWriter.newLine();
+        for (ReflectAnalysisModel reflectAnalysisModel : reflectAnalysisModelList) {
+          bufferedWriter.write(reflectAnalysisModel.getGeneratedMethodAccessorNameCount());
+          bufferedWriter.write(",");
+          bufferedWriter.write(reflectAnalysisModel.getRefName());
+          bufferedWriter.write(",");
+          bufferedWriter.write(reflectAnalysisModel.getGeneratedMethodAccessorNames());
+          bufferedWriter.newLine();
+        }
+        LOGGER.info("write csv file end");
+      }
+    } catch (Exception e) {
+      LOGGER.error("export data to csv file exception: ", e);
+    }
   }
 
 }
