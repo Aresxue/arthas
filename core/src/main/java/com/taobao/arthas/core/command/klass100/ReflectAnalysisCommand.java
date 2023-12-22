@@ -55,7 +55,7 @@ public class ReflectAnalysisCommand extends AnnotatedCommand {
 
   @Override
   public void process(CommandProcess process) {
-    String resultFilePath = "reflect-analysis.result";
+    String resultFilePath = "reflect-analysis-result.csv";
     String message = String.format(
         "The reflect analysis.result result is being generated asynchronously, check the %s file later",
         resultFilePath);
@@ -245,7 +245,7 @@ public class ReflectAnalysisCommand extends AnnotatedCommand {
 
   private void exportDataToCsvFile(List<ReflectAnalysisModel> reflectAnalysisModelList,
       String resultFilePath) {
-    LOGGER.info("start write reflect analysis result: {} csv file: {}",
+    LOGGER.info("start write reflect analysis result: {} to file: {}",
         reflectAnalysisModelList.size(), resultFilePath);
     File file = new File(resultFilePath);
     try {
@@ -263,7 +263,8 @@ public class ReflectAnalysisCommand extends AnnotatedCommand {
         bufferedWriter.write("names");
         bufferedWriter.newLine();
         for (ReflectAnalysisModel reflectAnalysisModel : reflectAnalysisModelList) {
-          bufferedWriter.write(reflectAnalysisModel.getGeneratedMethodAccessorNameCount());
+          bufferedWriter.write(
+              String.valueOf(reflectAnalysisModel.getGeneratedMethodAccessorNameCount()));
           bufferedWriter.write(",");
           bufferedWriter.write(reflectAnalysisModel.getRefName());
           bufferedWriter.write(",");
